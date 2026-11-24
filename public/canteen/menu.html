@@ -30,6 +30,7 @@
 
     <div class="card">
       <h2>Your Cart</h2>
+      <p class="muted">Your cart is saved on this device, even if you leave this page.</p>
       <div id="cartList" class="muted">Cart is empty</div>
       <div style="display:flex; justify-content:space-between; margin-top:12px; font-weight:600;">
         <span>Total</span>
@@ -54,7 +55,22 @@
 
     let menuItems = [];
     let activeCategory = 'Food & Meals';
-    const cart = {}; // menuItemId -> qty
+
+    // Cart survives navigating away/back and page reloads. One cart per user.
+    const user = Kahe.getUser();
+    const cartKey = `kahe_cart_${user ? user.id : 'guest'}`;
+    function loadCart() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(cartKey) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+    function saveCart() {
+      localStorage.setItem(cartKey, JSON.stringify(cart));
+    }
+    const cart = loadCart(); // menuItemId -> qty
 
     function renderMenu() {
       const el = document.getElementById('menuList');
@@ -117,6 +133,7 @@
       const item = menuItems.find(menuItem => menuItem.id == id);
       const max = item && item.stock_quantity !== null ? item.stock_quantity : Infinity;
       cart[id] = action === 'inc' ? Math.min(max, current + 1) : Math.max(0, current - 1);
+      saveCart();
       renderMenu();
       renderCart();
     });
@@ -145,6 +162,7 @@
           method: 'POST',
           body: JSON.stringify({ items })
         });
+        localStorage.removeItem(cartKey); // order placed: start with a fresh cart
         window.location.href = `/canteen/checkout.html?orderId=${data.orderId}`;
       } catch (err) {
         errorEl.textContent = err.message;
@@ -160,6 +178,7 @@
           const item = menuItems.find(menuItem => menuItem.id == id);
           if (!item || (item.stock_quantity !== null && cart[id] > item.stock_quantity)) delete cart[id];
         }
+        saveCart();
         renderMenu();
         renderCart();
       } catch (err) {

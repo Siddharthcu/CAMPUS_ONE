@@ -82,6 +82,7 @@
                 <strong>Order #${order.id}</strong>
                 <span class="muted">${escapeHtml(order.student_name)} · ${escapeHtml(order.student_email)}</span>
                 <span class="muted">${items || 'No items'}</span>
+                ${order.cancelled_at ? `<span class="muted">Cancelled ${escapeHtml(order.cancelled_at)}</span>` : ''}
               </div>
               <div class="staff-order-meta">
                 <strong>₹${order.total}</strong>

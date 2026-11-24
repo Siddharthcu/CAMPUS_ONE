@@ -56,7 +56,8 @@ Payment is a simulation — no real money is processed. New accounts can self-re
 
 ## Features
 
-- **Canteen:** category tabs, cart, stock limits, staff menu management, mock UPI payment, and a signed single-use pickup QR. Unpaid orders release their reserved stock after 15 minutes; paid pickup codes expire after 40 minutes.
+- **Canteen:** category tabs, a cart that survives page navigation, stock limits, staff menu management, mock UPI payment, and a signed single-use pickup QR. Unpaid orders release their reserved stock after 15 minutes; paid pickup codes expire after 40 minutes.
+- **My Orders:** students can review all their past orders, see item details and statuses, open a paid order's QR again, and cancel an order before pickup (cancelling returns the reserved stock and invalidates the QR). Staff see cancelled orders with their status in the live queue.
 - **Pickup scanner:** staff/admin can scan (or manually paste) a QR token, see the student and items, and redeem it once. Replays and expired codes are rejected.
 - **Announcements:** read-only for students; staff/admin can post.
 - **Bus tracking:** simulated live positions, delays, per-stop scheduled/live times and ETAs (placeholder for a real GPS feed).

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS orders (
   expires_at TEXT,           -- pickup deadline, only set after payment
   reservation_expires_at TEXT, -- unpaid orders release their stock after this
   picked_up_at TEXT,
+  cancelled_at TEXT,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
@@ -101,6 +102,7 @@ ensureColumn('menu_items', 'category', "ALTER TABLE menu_items ADD COLUMN catego
 ensureColumn('menu_items', 'stock_quantity', 'ALTER TABLE menu_items ADD COLUMN stock_quantity INTEGER');
 ensureColumn('orders', 'qr_token_value', 'ALTER TABLE orders ADD COLUMN qr_token_value TEXT');
 ensureColumn('orders', 'reservation_expires_at', 'ALTER TABLE orders ADD COLUMN reservation_expires_at TEXT');
+ensureColumn('orders', 'cancelled_at', 'ALTER TABLE orders ADD COLUMN cancelled_at TEXT');
 
 // Old pending orders need a payment deadline too.
 db.exec(

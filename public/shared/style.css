@@ -137,6 +137,7 @@ input:focus, select:focus { border-color: #4f8ff8; box-shadow: 0 0 0 4px rgba(59
 .dashboard-tile:nth-child(2) .icon { background: #fff0e5; }
 .dashboard-tile:nth-child(3) .icon { background: #e4f7f0; }
 .dashboard-tile:nth-child(4) .icon { background: #f1ecff; }
+.dashboard-tile:nth-child(5) .icon { background: #fff4d6; }
 .dashboard-tile .label { margin-bottom: 5px; font-family: Outfit, sans-serif; font-weight: 700; }
 
 .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }

@@ -245,10 +245,55 @@ router.get('/orders/:id/qr', requireAuth, async (req, res, next) => {
 router.get('/orders/:id', requireAuth, (req, res) => {
   expireStaleOrders();
   const order = db
-    .prepare('SELECT id, status, total, created_at, expires_at, reservation_expires_at, picked_up_at FROM orders WHERE id = ? AND user_id = ?')
+    .prepare('SELECT id, status, total, created_at, paid_at, expires_at, reservation_expires_at, picked_up_at, cancelled_at FROM orders WHERE id = ? AND user_id = ?')
     .get(req.params.id, req.user.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   res.json({ order });
+});
+
+// ---- Student: list all of their own orders, newest first ----
+router.get('/my/orders', requireAuth, (req, res) => {
+  expireStaleOrders();
+  const orders = db.prepare(
+    `SELECT id, status, total, created_at, paid_at, expires_at, reservation_expires_at,
+            picked_up_at, cancelled_at
+     FROM orders WHERE user_id = ? ORDER BY id DESC`
+  ).all(req.user.id);
+
+  const getItems = db.prepare(
+    `SELECT mi.name, oi.qty, oi.price_each
+     FROM order_items oi JOIN menu_items mi ON mi.id = oi.menu_item_id
+     WHERE oi.order_id = ?`
+  );
+
+  res.json({ orders: orders.map(order => ({ ...order, items: getItems.all(order.id) })) });
+});
+
+// ---- Student: cancel an order before it has been picked up ----
+router.post('/orders/:id/cancel', requireAuth, (req, res) => {
+  expireStaleOrders();
+  const order = db
+    .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+    .get(req.params.id, req.user.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (!['pending', 'paid'].includes(order.status)) {
+    return res.status(400).json({ error: `Order is ${order.status} and cannot be cancelled` });
+  }
+
+  try {
+    db.transaction(() => {
+      const update = db.prepare(
+        "UPDATE orders SET status = 'cancelled', cancelled_at = datetime('now'), qr_token_value = NULL WHERE id = ? AND status IN ('pending', 'paid')"
+      ).run(order.id);
+      if (update.changes === 0) throw new Error('Order can no longer be cancelled');
+      // The stock was reserved when the order was created; give it back.
+      restoreStock(order.id);
+    })();
+  } catch (err) {
+    return res.status(409).json({ error: err.message });
+  }
+
+  res.json({ ok: true, orderId: order.id, status: 'cancelled' });
 });
 
 // ---- Staff: view the canteen order queue ----
@@ -257,7 +302,7 @@ router.get('/orders/:id', requireAuth, (req, res) => {
 router.get('/staff/orders', requireAuth, requireRole('staff', 'admin'), (req, res) => {
   expireStaleOrders();
   const orders = db.prepare(
-    `SELECT o.id, o.total, o.status, o.created_at, o.paid_at, o.expires_at, o.picked_up_at,
+    `SELECT o.id, o.total, o.status, o.created_at, o.paid_at, o.expires_at, o.picked_up_at, o.cancelled_at,
             u.name AS student_name, u.email AS student_email
      FROM orders o
      JOIN users u ON u.id = o.user_id
