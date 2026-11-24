@@ -1,6 +1,35 @@
 # Campus One
 
-A small web app for a campus super-app demo: canteen pre-order with QR pickup, announcements, a simulated bus tracker, and student status. Built with plain HTML/CSS/JS on the frontend and Express + SQLite on the backend — no build step.
+A small web app for a campus super-app demo: canteen pre-order with QR pickup, announcements, a simulated bus tracker, and student status. Built with plain HTML/CSS/JS on the frontend and Express + SQLite on the backend.
+
+## System Requirements
+
+### Required Software
+
+- **Node.js** 18 or newer
+- **npm**
+- **Git**
+- **Python 3**
+- **Make**
+- **GCC / G++** (C/C++ compiler, required for native modules if prebuilt binaries are unavailable)
+
+### Install Dependencies
+
+#### openSUSE
+```bash
+sudo zypper install -y nodejs npm git python3 make gcc-c++
+```
+
+#### Ubuntu / Debian
+```bash
+sudo apt update
+sudo apt install -y nodejs npm git python3 make g++
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S nodejs npm git python base-devel
+```
 
 ## Setup
 
@@ -23,18 +52,6 @@ Start the server:
 npm start
 ```
 
-On first run the server automatically creates a private `.env` with fresh random secrets (and seeds `kahe.sqlite`). Nothing else to configure — this works on any new machine. `.env` and the database are gitignored, so each clone gets its own keys and data.
-
-If you want to set the values yourself instead, copy `.env.example` to `.env` before starting; the server will use your file and leave it alone.
-
-| Variable | Purpose |
-| --- | --- |
-| `JWT_SECRET` | Signs login tokens |
-| `QR_SECRET` | Signs pickup QR tokens (keep different from `JWT_SECRET`) |
-| `PORT` | Server port, default `3000` |
-| `CORS_ORIGIN` | `false` (same-origin only) or an allowed origin for a separate frontend |
-
-Open <http://localhost:3000>.
 
 ## Demo login credentials
 
@@ -44,7 +61,7 @@ Open <http://localhost:3000>.
 | Staff | `staff@college.edu` | `password123` |
 | Admin | `admin@college.edu` | `password123` |
 
-Payment is a simulation — no real money is processed. New accounts can self-register as students with a `@college.edu` email.
+Payment is a simulation — no real money is processed.
 
 ## Features
 
@@ -73,6 +90,6 @@ kahe.sqlite*            Local demo database (not committed)
 
 ## Notes
 
-- The SQLite database and `.env` are gitignored. A fresh database is seeded automatically on first start.
-- Migrations run once and are tracked in the `app_meta` table, so staff edits to menu items are not overwritten on restart.
 - This is a college demo, not production-ready: tokens are not revocable after logout, the rate limiter is in-memory, and bus data is simulated.
+- Assisted by opencode 
+- By Bite codez
