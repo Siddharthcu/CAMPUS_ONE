@@ -19,19 +19,29 @@
   <script src="/shared/auth.js"></script>
   <script>
     Kahe.requireLogin();
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[character]));
+    }
+
     (async function init() {
       try {
         const { status } = await Kahe.api('/api/student/status');
         document.getElementById('statusCard').innerHTML = `
           <h2>Attendance</h2>
-          <p>${status.attendance_pct}%</p>
+          <p>${escapeHtml(status.attendance_pct)}%</p>
           <h2>Fee Status</h2>
-          <p>${status.fee_status}</p>
+          <p>${escapeHtml(status.fee_status)}</p>
           <h2>Library Books Due</h2>
-          <p>${status.library_books_due}</p>
+          <p>${escapeHtml(status.library_books_due)}</p>
         `;
       } catch (err) {
-        document.getElementById('statusCard').innerHTML = `<span class="error">${err.message}</span>`;
+        const errorEl = document.createElement('span');
+        errorEl.className = 'error';
+        errorEl.textContent = err.message;
+        document.getElementById('statusCard').replaceChildren(errorEl);
       }
     })();
   </script>

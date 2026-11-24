@@ -29,13 +29,17 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id INTEGER NOT NULL,
   total REAL NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | picked_up | expired | cancelled
-  qr_token TEXT,
+  qr_token TEXT,             -- jti of the pickup token (legacy compatibility)
+  qr_token_value TEXT,       -- the exact signed JWT issued at payment time
   created_at TEXT DEFAULT (datetime('now')),
   paid_at TEXT,
-  expires_at TEXT,
+  expires_at TEXT,           -- pickup deadline, only set after payment
+  reservation_expires_at TEXT, -- unpaid orders release their stock after this
   picked_up_at TEXT,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_orders_status_expiry ON orders(status, expires_at);
 
 CREATE TABLE IF NOT EXISTS order_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,35 +84,34 @@ CREATE TABLE IF NOT EXISTS student_status (
   library_books_due INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+-- Tracks one-time upgrades so staff edits are never overwritten on restart.
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
 `);
 
-// Upgrade databases created before menu categories were added.
-const menuColumns = db.prepare('PRAGMA table_info(menu_items)').all();
-if (!menuColumns.some(column => column.name === 'category')) {
-  db.exec("ALTER TABLE menu_items ADD COLUMN category TEXT NOT NULL DEFAULT 'Food & Meals'");
+// Schema upgrades for databases created by older versions.
+function ensureColumn(table, column, ddl) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some(columnInfo => columnInfo.name === column)) db.exec(ddl);
 }
-if (!menuColumns.some(column => column.name === 'stock_quantity')) {
-  db.exec('ALTER TABLE menu_items ADD COLUMN stock_quantity INTEGER');
+ensureColumn('menu_items', 'category', "ALTER TABLE menu_items ADD COLUMN category TEXT NOT NULL DEFAULT 'Food & Meals'");
+ensureColumn('menu_items', 'stock_quantity', 'ALTER TABLE menu_items ADD COLUMN stock_quantity INTEGER');
+ensureColumn('orders', 'qr_token_value', 'ALTER TABLE orders ADD COLUMN qr_token_value TEXT');
+ensureColumn('orders', 'reservation_expires_at', 'ALTER TABLE orders ADD COLUMN reservation_expires_at TEXT');
+
+// Old pending orders need a payment deadline too.
+db.exec(
+  "UPDATE orders SET reservation_expires_at = datetime(created_at, '+15 minutes') WHERE reservation_expires_at IS NULL AND status = 'pending'"
+);
+
+function runOnce(key, upgrade) {
+  if (db.prepare('SELECT 1 FROM app_meta WHERE key = ?').get(key)) return;
+  upgrade();
+  db.prepare('INSERT INTO app_meta (key, value) VALUES (?, ?)').run(key, new Date().toISOString());
 }
-
-// Put the original menu items into their correct groups whenever an existing
-// database is opened. This also makes the update work for demo databases that
-// were created before categories existed.
-const setMenuCategory = db.prepare('UPDATE menu_items SET category = ? WHERE name = ?');
-[
-  ['Food & Meals', 'Masala Dosa'],
-  ['Food & Meals', 'Fried Rice'],
-  ['Snacks & Beverages', 'Veg Sandwich'],
-  ['Snacks & Beverages', 'Samosa (2 pcs)'],
-  ['Snacks & Beverages', 'Cold Coffee'],
-  ['Snacks & Beverages', 'Veg Puff']
-].forEach(([category, name]) => setMenuCategory.run(category, name));
-
-// Food & Meals start with 15 portions in the demo. Snacks and beverages keep
-// their existing unlimited availability unless a staff member sets a quantity.
-db.prepare(
-  "UPDATE menu_items SET stock_quantity = 15 WHERE category = 'Food & Meals' AND stock_quantity IS NULL"
-).run();
 
 // ---- Seed data (only if empty) ----
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
@@ -193,18 +196,35 @@ if (userCount === 0) {
   ).run('Paid');
 }
 
-// Add the new category items to an already-created demo database without
-// duplicating anything when the server restarts.
-const insertMenuIfMissing = db.prepare(
-  `INSERT INTO menu_items (name, price, category, stock_quantity, available)
-   SELECT ?, ?, ?, ?, 1
-   WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = ?)`
-);
-[
-  ['Idly (3 pcs)', 35, 'Food & Meals', 15],
-  ['Parotta (2 pcs)', 45, 'Food & Meals', 15],
-  ['Veg Burger', 55, 'Snacks & Beverages', null],
-  ['Tea', 12, 'Snacks & Beverages', null]
-].forEach(([name, price, category, stock]) => insertMenuIfMissing.run(name, price, category, stock, name));
+// Legacy data cleanup runs exactly once AFTER seeding, so a fresh database
+// never gets duplicate items and staff edits survive restarts.
+runOnce('legacy-menu-fixes-v1', () => {
+  const setMenuCategory = db.prepare('UPDATE menu_items SET category = ? WHERE name = ?');
+  [
+    ['Food & Meals', 'Masala Dosa'],
+    ['Food & Meals', 'Fried Rice'],
+    ['Snacks & Beverages', 'Veg Sandwich'],
+    ['Snacks & Beverages', 'Samosa (2 pcs)'],
+    ['Snacks & Beverages', 'Cold Coffee'],
+    ['Snacks & Beverages', 'Veg Puff']
+  ].forEach(([category, name]) => setMenuCategory.run(category, name));
+  db.prepare(
+    "UPDATE menu_items SET stock_quantity = 15 WHERE category = 'Food & Meals' AND stock_quantity IS NULL"
+  ).run();
+});
+
+runOnce('legacy-menu-items-v1', () => {
+  const insertMenuIfMissing = db.prepare(
+    `INSERT INTO menu_items (name, price, category, stock_quantity, available)
+     SELECT ?, ?, ?, ?, 1
+     WHERE NOT EXISTS (SELECT 1 FROM menu_items WHERE name = ?)`
+  );
+  [
+    ['Idly (3 pcs)', 35, 'Food & Meals', 15],
+    ['Parotta (2 pcs)', 45, 'Food & Meals', 15],
+    ['Veg Burger', 55, 'Snacks & Beverages', null],
+    ['Tea', 12, 'Snacks & Beverages', null]
+  ].forEach(([name, price, category, stock]) => insertMenuIfMissing.run(name, price, category, stock, name));
+});
 
 module.exports = db;

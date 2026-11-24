@@ -15,7 +15,7 @@
     <div class="card" id="payCard">
       <h1>Order #<span id="orderId"></span></h1>
       <p>Total: <strong id="orderTotal"></strong></p>
-      <p class="muted">This is UPI payment for demo purposes.</p>
+      <p class="muted">This is UPI payment for demo purposes. Please pay within 15 minutes or your stock reservation will be released.</p>
       <div id="payError" class="error"></div>
       <button class="btn" id="payBtn" style="width:100%">Pay Now (UPI)</button>
     </div>
@@ -34,45 +34,97 @@
     Kahe.requireLogin();
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('orderId');
+
+    if (!/^\d+$/.test(orderId || '')) {
+      document.querySelector('.container').innerHTML = '<div class="card error">Invalid order link.</div>';
+      throw new Error('Invalid orderId');
+    }
     document.getElementById('orderId').textContent = orderId;
 
-    let pollTimer;
+    let pollTimer = null;
+    let qrLoaded = false;
+    let finished = false;
 
-    async function loadOrder() {
-      const { order } = await Kahe.api(`/api/canteen/orders/${orderId}`);
-      document.getElementById('orderTotal').textContent = `₹${order.total}`;
-
-      if (order.status === 'paid') {
-        showQr();
-      }
-      if (order.status === 'picked_up') {
-        document.getElementById('statusBadge').textContent = 'picked_up';
-        document.getElementById('statusBadge').className = 'badge picked_up';
-        document.getElementById('expiryNote').textContent = 'Picked up. Enjoy your meal!';
-        clearInterval(pollTimer);
-      }
+    function updateExpiry(expiresAt) {
+      const deadline = new Date(expiresAt).getTime();
+      if (!Number.isFinite(deadline)) return;
+      const mins = Math.max(0, Math.round((deadline - Date.now()) / 60000));
+      document.getElementById('expiryNote').textContent = mins > 0
+        ? `Expires in about ${mins} min if not picked up.`
+        : 'This code has expired. Please place a new order.';
     }
 
-    async function showQr() {
+    function stopPolling() {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      finished = true;
+    }
+
+    async function showQr(expiresAt) {
       document.getElementById('payCard').style.display = 'none';
       document.getElementById('qrCard').style.display = 'block';
-      const { dataUrl, expiresAt } = await Kahe.api(`/api/canteen/orders/${orderId}/qr`);
+      const { dataUrl, expiresAt: deadline } = await Kahe.api(`/api/canteen/orders/${orderId}/qr`);
       document.getElementById('qrImg').src = dataUrl;
-      const mins = Math.max(0, Math.round((new Date(expiresAt) - new Date()) / 60000));
-      document.getElementById('expiryNote').textContent = `Expires in about ${mins} min if not picked up.`;
+      updateExpiry(deadline || expiresAt);
 
-      // Poll every few seconds so the page updates to "picked_up" once staff scans it.
-      pollTimer = setInterval(loadOrder, 4000);
+      if (!pollTimer) pollTimer = setInterval(loadOrder, 4000);
     }
 
-    document.getElementById('payBtn').addEventListener('click', async () => {
+    async function loadOrder() {
+      try {
+        const { order } = await Kahe.api(`/api/canteen/orders/${orderId}`);
+        document.getElementById('orderTotal').textContent = `₹${order.total}`;
+
+        if (order.status === 'paid') {
+          if (!qrLoaded) {
+            qrLoaded = true; // fetch and display the QR exactly once
+            await showQr(order.expires_at);
+          } else if (order.expires_at) {
+            updateExpiry(order.expires_at);
+          }
+          return;
+        }
+
+        if (order.status === 'picked_up') {
+          stopPolling();
+          document.getElementById('payCard').style.display = 'none';
+          document.getElementById('qrCard').style.display = 'block';
+          document.getElementById('statusBadge').textContent = 'picked up';
+          document.getElementById('statusBadge').className = 'badge picked_up';
+          document.getElementById('expiryNote').textContent = 'Picked up. Enjoy your meal!';
+          return;
+        }
+
+        if (order.status === 'expired' || order.status === 'cancelled') {
+          stopPolling();
+          document.getElementById('payBtn').disabled = true;
+          document.getElementById('payError').textContent =
+            `Order ${order.status}. Please go back to the menu and place a new order.`;
+          return;
+        }
+
+        // Still pending: keep the pay button available.
+        document.getElementById('payBtn').disabled = false;
+      } catch (err) {
+        stopPolling();
+        document.getElementById('payError').textContent = err.message;
+      }
+    }
+
+    document.getElementById('payBtn').addEventListener('click', async (event) => {
+      if (finished) return;
+      const button = event.currentTarget;
       const errorEl = document.getElementById('payError');
       errorEl.textContent = '';
+      button.disabled = true;
+      button.textContent = 'Processing...';
       try {
         await Kahe.api(`/api/canteen/orders/${orderId}/pay`, { method: 'POST' });
-        showQr();
+        await showQr();
       } catch (err) {
         errorEl.textContent = err.message;
+        button.disabled = false;
+        button.textContent = 'Pay Now (UPI)';
       }
     });
 

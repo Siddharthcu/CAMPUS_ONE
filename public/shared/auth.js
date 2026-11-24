@@ -36,8 +36,9 @@ const Kahe = {
     const res = await fetch(path, { ...options, headers });
     const data = await res.json().catch(() => ({}));
 
-    if (res.status === 401) {
-      // token invalid/expired - send back to login
+    if (res.status === 401 && token) {
+      // Only a protected request with a saved token means our session expired.
+      // A failed login also returns 401, but must let the page show its error.
       this.logout();
       throw new Error('Session expired');
     }

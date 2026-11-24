@@ -3,17 +3,25 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { rateLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
+const authLimiter = rateLimit({ max: 10, windowMs: 10 * 60 * 1000 });
 
 // Register (open registration for demo - student role only)
-router.post('/register', (req, res) => {
-  const { name, email, password } = req.body;
+router.post('/register', authLimiter, (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email, password are required' });
   }
-  if (!email.endsWith('@college.edu')) {
+  if (!/^[^\s@]+@college\.edu$/.test(email)) {
     return res.status(400).json({ error: 'Use your college email (@college.edu)' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
@@ -30,8 +38,9 @@ router.post('/register', (req, res) => {
 });
 
 // Login
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', authLimiter, (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
   if (!email || !password) {
     return res.status(400).json({ error: 'email and password are required' });
   }

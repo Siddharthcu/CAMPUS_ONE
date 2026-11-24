@@ -109,12 +109,15 @@
         });
         title.textContent = '✅ Order Verified';
         title.style.color = '#16a34a';
-        const itemsHtml = data.items.map(i => `<div>${i.name} x${i.qty}</div>`).join('');
+        const itemsHtml = data.items
+          .map(i => `<div>${escapeHtml(i.name)} x${escapeHtml(i.qty)}</div>`)
+          .join('');
         body.innerHTML = `
-          <p><strong>${data.student.name}</strong> (${data.student.email})</p>
+          <p><strong>${escapeHtml(data.student.name)}</strong> (${escapeHtml(data.student.email)})</p>
           ${itemsHtml}
-          <p style="margin-top:8px;">Total: ₹${data.total}</p>
+          <p style="margin-top:8px;">Total: ₹${escapeHtml(data.total)}</p>
         `;
+        document.getElementById('manualToken').value = '';
         loadOrders();
       } catch (err) {
         title.textContent = '❌ Verification Failed';

@@ -29,7 +29,7 @@ function advanceBuses() {
 
     // Loop back to the start once it reaches the last stop (campus),
     // simulating the bus starting its route again.
-    if (pos > maxIndex) pos = pos % maxIndex;
+    if (pos > maxIndex) pos = pos % (maxIndex + 1);
 
     db.prepare('UPDATE buses SET current_position = ? WHERE id = ?').run(pos, bus.id);
   }

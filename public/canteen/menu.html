@@ -45,6 +45,13 @@
   <script src="/shared/auth.js"></script>
   <script>
     Kahe.requireLogin();
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[character]));
+    }
+
     let menuItems = [];
     let activeCategory = 'Food & Meals';
     const cart = {}; // menuItemId -> qty
@@ -63,7 +70,7 @@
         row.className = 'menu-item';
         row.innerHTML = `
           <div>
-            <div>${item.name}</div>
+            <div>${escapeHtml(item.name)}</div>
             <div class="muted">₹${item.price}</div>
             ${item.stock_quantity !== null ? `<div class="muted">Available: ${item.stock_quantity}</div>` : ''}
           </div>
@@ -94,7 +101,7 @@
         total += item.price * qty;
         const row = document.createElement('div');
         row.className = 'cart-item';
-        row.innerHTML = `<span>${item.name} x${qty}</span><span>₹${item.price * qty}</span>`;
+        row.innerHTML = `<span>${escapeHtml(item.name)} x${qty}</span><span>₹${item.price * qty}</span>`;
         el.appendChild(row);
       });
       document.getElementById('cartTotal').textContent = `₹${total}`;
@@ -107,7 +114,9 @@
       const id = btn.dataset.id;
       const action = btn.dataset.action;
       const current = cart[id] || 0;
-      cart[id] = action === 'inc' ? current + 1 : Math.max(0, current - 1);
+      const item = menuItems.find(menuItem => menuItem.id == id);
+      const max = item && item.stock_quantity !== null ? item.stock_quantity : Infinity;
+      cart[id] = action === 'inc' ? Math.min(max, current + 1) : Math.max(0, current - 1);
       renderMenu();
       renderCart();
     });
@@ -146,10 +155,18 @@
       try {
         const data = await Kahe.api('/api/canteen/menu');
         menuItems = data.items;
+        // Drop anything that sold out or was edited since the page loaded.
+        for (const id of Object.keys(cart)) {
+          const item = menuItems.find(menuItem => menuItem.id == id);
+          if (!item || (item.stock_quantity !== null && cart[id] > item.stock_quantity)) delete cart[id];
+        }
         renderMenu();
         renderCart();
       } catch (err) {
-        document.getElementById('menuList').innerHTML = `<span class="error">${err.message}</span>`;
+        const errorEl = document.createElement('span');
+        errorEl.className = 'error';
+        errorEl.textContent = err.message;
+        document.getElementById('menuList').replaceChildren(errorEl);
       }
     })();
   </script>

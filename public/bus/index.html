@@ -155,6 +155,12 @@
   <script>
     Kahe.requireLogin();
 
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[character]));
+    }
+
     let buses = [];
     let selectedId = null;
     let lastUpdatedAt = null;
@@ -163,7 +169,7 @@
       const row = document.getElementById('busSelectRow');
       row.innerHTML = buses.map(b => `
         <button class="bus-chip ${b.id === selectedId ? 'active' : ''}" data-id="${b.id}">
-          ${b.busNumber}
+          ${escapeHtml(b.busNumber)}
         </button>
       `).join('');
       row.querySelectorAll('.bus-chip').forEach(btn => {
@@ -182,6 +188,7 @@
       document.getElementById('routeTitle').textContent = `${bus.busNumber} - ${bus.routeName}`;
       document.getElementById('routeSubtitle').textContent =
         bus.delayMinutes > 0 ? `Running ~${bus.delayMinutes} min behind schedule` : 'On schedule';
+      // textContent above is safe; the template strings below are escaped.
 
       const maxIndex = bus.stops.length - 1;
       const timeline = document.getElementById('timeline');
@@ -195,19 +202,19 @@
             ${isCurrent ? '<div class="bus-live-badge">🚌</div>' : ''}
             <div class="stop-main">
               <div class="stop-info">
-                <div class="stop-name">${stop.stopName}</div>
-                <div class="stop-meta">${stop.distanceKm} km</div>
+                <div class="stop-name">${escapeHtml(stop.stopName)}</div>
+                <div class="stop-meta">${escapeHtml(stop.distanceKm)} km</div>
               </div>
               <div class="stop-times">
-                <div class="stop-time-sched">${stop.scheduledTime}</div>
-                <div class="stop-time-live">${stop.liveTime}</div>
+                <div class="stop-time-sched">${escapeHtml(stop.scheduledTime)}</div>
+                <div class="stop-time-live">${escapeHtml(stop.liveTime)}</div>
               </div>
             </div>
           </div>
         `;
       }).join('');
 
-      document.getElementById('footerLoc').textContent = bus.status;
+      document.getElementById('footerLoc').textContent = bus.status; // textContent is safe
     }
 
     function renderUpdatedAgo() {
@@ -229,7 +236,10 @@
         renderDetail();
         renderUpdatedAgo();
       } catch (err) {
-        document.getElementById('timeline').innerHTML = `<span class="error">${err.message}</span>`;
+        const errorEl = document.createElement('span');
+        errorEl.className = 'error';
+        errorEl.textContent = err.message;
+        document.getElementById('timeline').replaceChildren(errorEl);
       }
     }
 
