@@ -1,7 +1,26 @@
+const fs = require('fs');
+const path = require('path');
+
+// First run on a new machine: create a private .env with random secrets.
+// It is gitignored, so every clone gets its own keys with no manual setup.
+const envPath = path.join(__dirname, '..', '.env');
+if (!fs.existsSync(envPath)) {
+  const crypto = require('crypto');
+  const secret = () => crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(envPath, [
+    '# Generated automatically on first run. Delete to regenerate.',
+    `JWT_SECRET=${secret()}`,
+    `QR_SECRET=${secret()}`,
+    'PORT=3000',
+    'CORS_ORIGIN=false',
+    ''
+  ].join('\n'), { mode: 0o600 });
+  console.log('Created .env with fresh local secrets.');
+}
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 
 // Fail fast instead of serving broken auth/QR tokens if config is missing.
 for (const name of ['JWT_SECRET', 'QR_SECRET']) {

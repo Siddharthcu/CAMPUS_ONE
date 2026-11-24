@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Campus One - campus super app (canteen pre-order + QR pickup, announcements, bus tracking, student status)",
   "main": "server/index.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js"

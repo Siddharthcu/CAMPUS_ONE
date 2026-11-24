@@ -17,17 +17,15 @@ Install dependencies:
 npm install
 ```
 
-Create your local `.env` (it is intentionally not committed):
+Start the server:
 
 ```bash
-cp .env.example .env
+npm start
 ```
 
-Generate two different random secrets and put them in `.env`:
+On first run the server automatically creates a private `.env` with fresh random secrets (and seeds `kahe.sqlite`). Nothing else to configure — this works on any new machine. `.env` and the database are gitignored, so each clone gets its own keys and data.
 
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+If you want to set the values yourself instead, copy `.env.example` to `.env` before starting; the server will use your file and leave it alone.
 
 | Variable | Purpose |
 | --- | --- |
@@ -35,12 +33,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `QR_SECRET` | Signs pickup QR tokens (keep different from `JWT_SECRET`) |
 | `PORT` | Server port, default `3000` |
 | `CORS_ORIGIN` | `false` (same-origin only) or an allowed origin for a separate frontend |
-
-Start the server:
-
-```bash
-npm start
-```
 
 Open <http://localhost:3000>.
 
